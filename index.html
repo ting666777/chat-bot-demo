@@ -178,30 +178,7 @@
             // --- Gemini API 相關設定 ---
             const apiKey = ""; // 依據指示，將 API 金鑰保留為空字串
             // *** 修正錯誤：將 generativelace 改為 generativelanguage ***
-            // --- Ollama API 相關設定 ---
-            const apiUrl = "https://ef6a5404d755.ngrok.app/api/generate"; // ngrok + Ollama API 路徑
-            // 呼叫 Ollama API
-            const callOllamaAPI = async (userQuery) => {
-                const payload = {
-                    model: "llama3",
-                    prompt: `${personas[currentPersonaName].prompt}\n使用者：${userQuery}\n回覆：`,
-                    stream: false
-                };
-            
-                const response = await fetch(apiUrl, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload)
-                });
-            
-                if (!response.ok) {
-                    throw new Error(`Ollama API 錯誤: ${response.status}`);
-                }
-            
-                const result = await response.json();
-                return { text: result.response.trim() };
-            };
-
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
             // --- 角色設定 ---
             const personas = {
@@ -270,8 +247,7 @@
                 loadingIndicator.classList.remove('hidden');
 
                 try {
-                    //const response = await callGeminiAPI(query);
-                    const response = await callOllamaAPI(query);
+                    const response = await callGeminiAPI(query);
                     displayMessage('bot', response.text);
                 } catch (error) {
                     console.error("API 呼叫失敗:", error);
