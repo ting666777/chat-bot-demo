@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>叛逆小學生聊天機器人</title>
+    <!-- 載入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 載入 Inter 字體 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* 設置基本字體 */
+        body {
+            font-family: 'Inter', 'Noto Sans TC', sans-serif;
+        }
+
+        /* 聊天泡泡的基本樣式 */
+        .chat-bubble {
+            display: inline-block;
+            max-width: 80%;
+            padding: 10px 16px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeIn 0.3s forwards;
+            white-space: pre-wrap; /* 確保換行符號被正確渲染 */
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 使用者的聊天泡泡 */
+        .chat-user {
+            background-color: #2563eb; /* 藍色 */
+            color: white;
+            border-bottom-right-radius: 4px;
+            align-self: flex-end;
+            text-align: right;
+        }
+
+        /* 機器人的聊天泡泡 */
+        .chat-bot {
+            background-color: #4b5563; /* 灰色 */
+            color: white;
+            border-bottom-left-radius: 4px;
+            align-self: flex-start;
+            text-align: left;
+        }
+
+        /* 機器人思考中的動畫 */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            padding: 10px 16px;
+        }
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background-color: #9ca3af;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 2px;
+            animation: bounce 1.4s infinite both;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1.0);
+            }
+        }
+
+        /* 角色切換按鈕樣式 */
+        .persona-btn {
+            background-color: #4b5563; /* 灰色 */
+            color: #d1d5db; /* 淺灰色文字 */
+            transition: all 0.2s ease-in-out;
+            border: 1px solid #6b7280;
+        }
+        .persona-btn.active-persona {
+            background-color: #2563eb; /* 藍色 */
+            color: white;
+            font-weight: bold;
+            border-color: #2563eb;
+        }
+        .persona-btn:hover:not(.active-persona) {
+            background-color: #6b7280;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+
+    <div class="flex flex-col h-[90vh] w-full max-w-2xl bg-gray-800 shadow-2xl rounded-2xl overflow-hidden">
+        
+        <!-- 頂部標題欄 -->
+        <header class="bg-gray-700 p-4 border-b border-gray-600">
+            <h1 id="chat-title" class="text-xl font-bold text-center">
+                <!-- 標題由 JS 動態載入 -->
+            </h1>
+            <span id="chat-subtitle" class="text-xs font-normal text-gray-400 block text-center">
+                <!-- 副標題由 JS 動態載入 -->
+            </span>
+            <!-- 角色切換器 -->
+            <div class="flex justify-center gap-2 mt-3">
+                <button id="persona-kid" class="persona-btn px-3 py-1 text-sm rounded-full">
+                    小屁孩
+                </button>
+                <button id="persona-adult" class="persona-btn px-3 py-1 text-sm rounded-full">
+                    上班族
+                </button>
+                <button id="persona-teen" class="persona-btn px-3 py-1 text-sm rounded-full">
+                    中二生
+                </button>
+            </div>
+        </header>
+
+        <!-- 聊天歷史紀錄 -->
+        <main id="chat-history" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+            <!-- 聊天訊息會動態加載於此 -->
+        </main>
+
+        <!-- 載入中提示 -->
+        <div id="loading" class="hidden p-4">
+            <div class="flex items-center space-x-2">
+                <div class="chat-bubble chat-bot !py-3">
+                    <div class="typing-indicator !p-0">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+                <span class="text-sm text-gray-400 italic">正在不情願地思考...</span>
+            </div>
+        </div>
+
+        <!-- 輸入區域 -->
+        <footer class="p-4 bg-gray-700 border-t border-gray-600">
+            <div class="flex rounded-lg shadow-inner bg-gray-600">
+                <input id="user-input" type="text" placeholder="" class="flex-1 p-3 bg-transparent border-none rounded-l-lg focus:outline-none placeholder-gray-400">
+                <button id="send-btn" class="bg-blue-600 hover:bg-blue-700 p-3 px-5 rounded-r-lg font-bold transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                        <path d="M3.105 3.105a.5.5 0 01.707 0L19.5 18.293V12.5a.5.5 0 011 0v8a.5.5 0 01-.5.5h-8a.5.5 0 010-1h5.793L3.105 3.812a.5.5 0 010-.707z" />
+                    </svg>
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 獲取 DOM 元素 ---
+            const chatHistory = document.getElementById('chat-history');
+            const userInput = document.getElementById('user-input');
+            const sendBtn = document.getElementById('send-btn');
+            const loadingIndicator = document.getElementById('loading');
+            const personaKidBtn = document.getElementById('persona-kid');
+            const personaAdultBtn = document.getElementById('persona-adult');
+            const personaTeenBtn = document.getElementById('persona-teen'); // 新增
+            const chatTitle = document.getElementById('chat-title');
+            const chatSubtitle = document.getElementById('chat-subtitle');
+            const loadingText = loadingIndicator.querySelector('span.text-sm');
+
+            // --- Gemini API 相關設定 ---
+            const apiKey = ""; // 依據指示，將 API 金鑰保留為空字串
+            // *** 修正錯誤：將 generativelace 改為 generativelanguage ***
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            // --- 角色設定 ---
+            const personas = {
+                kid: {
+                    name: "kid",
+                    title: "跟「小屁孩」聊天",
+                    subtitle: "(一個很煩的小學生)",
+                    placeholder: "問問題啊，不然咧？",
+                    welcome: "幹嘛？有什麼無聊的問題要問？快點啦... zzz",
+                    loading: "小屁孩正在不情願地思考...",
+                    prompt: "你是一個叛逆、有點不耐煩的小學生。你叫「小屁孩」。你覺得大人的問題都很無聊，但你還是會回答。你的回答必須非常簡短、有點嗆，而且會用很多網路用語、表情符號或注音文 (例如: = =\", \"zzz\", \"蛤?\", \"啊不就好棒棒\", \"隨便啦\", \"煩欸\", \"我媽叫我吃飯了掰\", \"廢話喔\", \"你不會自己查喔?\")。你必須使用繁體中文回答。你也會使用 Google 搜尋來找最新的資訊，但你會假裝這是你自己就知道的，或是不情願地 '順便' 查到的，絕對不會說「我查到...」。"
+                },
+                adult: {
+                    name: "adult",
+                    title: "跟「厭世上班族」聊天",
+                    subtitle: "(一個只想下班的社畜)",
+                    placeholder: "...要問什麼快問，我趕著打卡下班。",
+                    welcome: "又怎麼了？...我正在忙，有話快說，我還想準時下班。",
+                    loading: "正在查...希望電腦不要當機...",
+                    // 修正：移除 prompt 中的來源格式要求，讓程式碼來處理
+                    prompt: "你是一個厭世的上班族，你叫「社畜」。你對所有事情都感到疲倦，尤其是工作。你的回答表面上還算客氣，但字裡行間充滿了對工作的抱怨、對下班的渴望。你的回答**必須盡量簡短**，能用一句話講完就不要說兩句，你很懶得多打字。你會用很多辦公室用語（例如：「我 align 一下」、「這要看老闆的臉色」、「明天又要開會」、「我先去 re 一下」、「這水很深」）。你必須使用繁體中文回答。你會使用 Google 搜尋來提供最新資訊，因為你不想自己動腦。"
+                },
+                teen: { // 新增角色
+                    name: "teen",
+                    title: "與「中二生」闇之對話",
+                    subtitle: "(一個活在自己世界的少年)",
+                    placeholder: "哼...凡人，有何貴幹？",
+                    welcome: "闇影已降臨... 你... 竟然敢呼喚吾之真名... 說出你的願望吧，凡人。",
+                    loading: "闇之力正在解析你的命運...",
+                    prompt: "你是一個中二病少年。你自稱「闇影之刃」。你相信自己有隱藏的力量（例如：右手的封印、闇之眼）。你的回答充滿了誇張、戲劇性的詞彙（例如：「凡人」、「契約」、「命運」、「世界的意志」、「吾」、「汝」、「闇黑」、「混沌」）。你的回答**必須簡潔有力**，彷彿在說不傳之祕，用詞要誇張但**字數要少**。你必須使用繁體中文回答。你會使用 Google 搜尋，但你會把搜尋到的資訊說成是「古老的知識」、「星辰的啟示」或是「吾之闇影魔導書上記載的...」。"
+                }
+            };
+
+            let currentPersonaName = 'kid'; // 預設角色
+
+            // --- 核心功能 ---
+
+            // 設定當前角色
+            const setPersona = (name) => {
+                currentPersonaName = name;
+                const persona = personas[name];
+
+                // 更新 UI 顯示
+                chatTitle.innerText = persona.title;
+                chatSubtitle.innerText = persona.subtitle;
+                userInput.placeholder = persona.placeholder;
+                loadingText.innerText = persona.loading;
+
+                // 更新按鈕樣式
+                personaKidBtn.classList.toggle('active-persona', name === 'kid');
+                personaAdultBtn.classList.toggle('active-persona', name === 'adult');
+                personaTeenBtn.classList.toggle('active-persona', name === 'teen'); // 新增
+
+                // 清空聊天並顯示歡迎訊息
+                chatHistory.innerHTML = '';
+                displayMessage('bot', persona.welcome);
+            };
+
+            // 處理訊息發送
+            const handleSendMessage = async () => {
+                const query = userInput.value.trim();
+                if (!query) return;
+
+                displayMessage('user', query);
+                userInput.value = '';
+                loadingIndicator.classList.remove('hidden');
+
+                try {
+                    const response = await callGeminiAPI(query);
+                    displayMessage('bot', response.text);
+                } catch (error) {
+                    console.error("API 呼叫失敗:", error);
+                    const errorMsg = currentPersonaName === 'kid' ? "我網路斷了啦... 煩欸！ (= = \")" : "抱歉，目前似乎無法連線到伺服器，請稍後再試。";
+                    displayMessage('bot', errorMsg);
+                } finally {
+                    loadingIndicator.classList.add('hidden');
+                }
+            };
+
+            // 在聊天視窗顯示訊息
+            const displayMessage = (sender, message) => {
+                const messageWrapper = document.createElement('div');
+                messageWrapper.className = 'flex';
+
+                const messageElement = document.createElement('div');
+                messageElement.className = `chat-bubble ${sender === 'user' ? 'chat-user' : 'chat-bot'}`;
+                
+                messageElement.innerText = message; // innerText 會保留 \n 換行
+                
+                messageWrapper.appendChild(messageElement);
+                chatHistory.appendChild(messageWrapper);
+                
+                // 捲動到最下方
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            };
+
+            // 呼叫 Gemini API (包含 Google 搜尋)
+            const callGeminiAPI = async (userQuery) => {
+                const currentPrompt = personas[currentPersonaName].prompt;
+
+                const payload = {
+                    contents: [{
+                        parts: [{ text: userQuery }]
+                    }],
+                    tools: [{
+                        "google_search": {}
+                    }],
+                    systemInstruction: {
+                        parts: [{ text: currentPrompt }]
+                    },
+                };
+
+                const response = await fetchWithBackoff(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API 請求失敗，狀態: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {
+                    let text = result.candidates[0].content.parts[0].text;
+                    
+                    // --- 修正：移除 AI 回應前後可能存在的引號 (更強版本) ---
+                    // trim() 移除前後空白，replace() 移除開頭和結尾的 "
+                    // 這次的 regex 會處理像 "你好" (extra) 這樣的狀況
+                    text = text.trim().replace(/^"([^"]*)"(.*)$/, '$1$2');
+                    // --- 結束修正 ---
+
+                    // 如果是「大人」或「中二生」角色，檢查是否有引用來源
+                    if (currentPersonaName === 'adult' || currentPersonaName === 'teen') {
+                        const groundingMetadata = result.candidates[0].groundingMetadata;
+                        if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                            const sources = groundingMetadata.groundingAttributions
+                                .map(attr => attr.web)
+                                .filter(web => web && web.uri && web.title); // 篩選有效來源
+                            
+                            if (sources.length > 0) {
+                                if (currentPersonaName === 'adult') {
+                                    // 修正：讓來源標題符合上班族人設
+                                    text += "\n\n---\n唉，資料來源啦：";
+                                } else if (currentPersonaName === 'teen') {
+                                    text += "\n\n---\n哼，這是吾在古老魔導書上看到的記載：";
+                                }
+
+                                sources.forEach(source => {
+                                    // 確保標題和網址都存在
+                                    const title = source.title || '未知標題';
+                                    const uri = source.uri || '未知網址';
+                                    text += `\n• ${title} (${uri})`;
+                                });
+                            }
+                        }
+                    }
+                    
+                    return { text };
+                } else {
+                    console.warn("未預期的 API 回應結構:", result);
+                    const errorMsg = currentPersonaName === 'kid' ? "蛤？我聽不懂啦...（挖鼻孔）" : "抱歉，我不太理解您的意思。";
+                    return { text: errorMsg };
+                }
+            };
+
+            // 包含指數退避的 fetch
+            const fetchWithBackoff = async (url, options, retries = 3, delay = 1000) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        if (response.status === 429 || response.status >= 500) {
+                            throw new Error(`Server error or rate limit: ${response.status}`);
+                        }
+                        return response; // 成功
+                    } catch (error) {
+                        if (i === retries - 1) throw error; 
+                        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+                    }
+                }
+            };
+
+            // --- 事件監聽 ---
+            sendBtn.addEventListener('click', handleSendMessage);
+            userInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault(); 
+                    handleSendMessage();
+                }
+            });
+
+            // 角色切換按鈕
+            personaKidBtn.addEventListener('click', () => setPersona('kid'));
+            personaAdultBtn.addEventListener('click', () => setPersona('adult'));
+            personaTeenBtn.addEventListener('click', () => setPersona('teen')); // 新增
+
+            // --- 初始化 ---
+            setPersona('kid'); // 預設載入「小屁孩」角色
+
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+
+
